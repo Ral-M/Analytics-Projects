@@ -1,0 +1,519 @@
+---
+title: __ANLY 500 - Midterm Code Answers__
+author: __Ralchukwu Mogbogu__
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Instructions
+
+You will need to complete the portion of the exam before starting the second portion. You will use your answers on this exam to complete the second half. Only knitted files will be graded! Make sure your complete this portion of the exam on your own. Use your notes and class examples to get started with the code. 
+
+# Abstract
+
+Eventual memory performance is predicted more accurately when a person's judgment of learning (JOL) is delayed until shortly after studying an item than when made immediately after studying the item. According to the transfer-appropriate-monitoring hypothesis, this delayed- JOL effect arises because of the contextual similarity between the cue for the JOL and the cue for the memory test. In a paired-associate learning experiment, delayed JOLs were cued by the stimulus alone or by the stimulus-response pair, and the eventual test was associative recognition of stimulus-response pairs. Recognition of stimulus-response pairs was predicted more accurately when JOLs had been cued by the stimulus alone than when they had been cued by the stimulus-response pair, even though the latter was more similar than the former to the cue for the recognition test. Implications of these results, especially the lack of support for the class of theories emphasizing transfer-appropriate monitoring, are discussed for theories of the accuracy of JOLs.
+
+# Method
+
+In these experiments, participants are given English word pairs to learn (i.e. dog-table). They are asked after each word pair: “how confident are you that in about ten minutes from now you will be able to recognize the second of the item when prompted with the first? (0 = definitely won't recognize, 20 = 20% sure, 40 ..., 60 ..., 80 ..., 100 = definitely will recognize). These ratings (JOLs) were given either right after the word pair was presented or after the entire block of word pairs were presented. These ratings were prompted with either just the cue word (i.e. dog, the first word of each pair) or both the words (stimulus-response pairing). After all word-pairs were studied, a 10-minute break was given. Participants were then measured by marking which word-pairings they recognized (0 = not studied, 20 = 20 % sure studied, 40 ..., 60 ..., 80 ..., 100 = definitely studied). You can assume the ratings are continuous.  
+
+# Dataset:
+
+- JOL group: if they rated their confidence immediately or at the end of each block for how well they would remember the word-pairs.
+- Type cue: what type of cue they were using to rate their confidence, either the word-pair or the cue word only.
+- Confidence: their average rated confidence to remember word pairs across trial blocks.
+- Recognition: their average memory for words across trial blocks.
+  
+In this section, the data will be loaded for you from the package. You will change the id = 123456 to your HU id number. This number will generate your data for you in the same time each way, so if you rerun this analysis, you will get the same numbers each time.   
+
+```{r library}
+
+    library(learnSTATS)
+    library(skimr)
+    library(mice) 
+    library(dplyr)
+    library(ggplot2)
+    library(corrplot)
+    library(MOTE)
+
+```
+
+
+
+```{r starting}
+
+    midterm <- midterm_data(idnum = 285166) #CHANGE ME
+    head(midterm)
+```
+__Summary: __
+
+My __ID__ of __285166__ is inputted. 
+
+
+# Data screening:
+
+## Accuracy:
+    
+- Include output and indicate how the data are not accurate.
+- Include output to show how you fixed the accuracy errors, and describe what you did.
+
+```{r accuracy}
+
+    skim(midterm)
+    
+    # Creating  a copy of the original dataset
+    copy_midtermDf = midterm
+    
+    # handling categorical variables
+    ## # Fixing the accuracy errors
+    copy_midtermDf$JOL_group <- as.factor(copy_midtermDf$JOL_group)
+    copy_midtermDf$type_cue <- as.factor(copy_midtermDf$type_cue)
+    
+    # handling continuous varaibles
+    ## selecting only numerical variables
+    col_numeric <- sapply(copy_midtermDf, is.numeric)
+    numerical_values <- copy_midtermDf[, col_numeric]
+    
+    summary(numerical_values)
+    
+    # summary
+    print("Summary: Before")
+    summary(copy_midtermDf)
+  
+    ## # Fixing the accuracy errors for continuous variables  
+    copy_midtermDf$conf4[which(copy_midtermDf$conf4 < 0 | copy_midtermDf$conf4 > 100)] = NA
+    
+    copy_midtermDf$conf10[which(copy_midtermDf$conf10 < 0 | copy_midtermDf$conf10 > 100)] = NA
+    
+    copy_midtermDf$rec5[which(copy_midtermDf$rec5 < 0 | copy_midtermDf$rec5 > 100)] = NA
+  
+    print("Summary: After")
+    summary(copy_midtermDf)
+
+
+```
+
+__Summary: Accuracy Checks and Information explained __
+
+The 'midterm' dataset's 'skimr' output is comprehensive, containing rich information. Within the dataset are 2 categorical variables and 20 numerical variables, each containing precisely 7 missing values in their numerical columns ('conf1' to 'rec10'). The categorical column 'type_cue' also contains 7 missing values, which could indicate the presence of outliers. It may be necessary to take additional measures, such as imputing missing values and handling outliers, to ensure the accuracy of subsequent analyses. The next block tackles the missing values issue and outliers. The 'skimr' output shows that 7 values need to be added for type_cue, meaning 257 instead of 264, to match the number of observations present—likewise, all the numerical variables with 7 missing values. 
+
+I made a copy of the original dataset named 'midterm.' I saved it in an object called 'copy_midtermDf,' and I did this to be able to perform further analysis and compare it against the original dataset. I modified the data to ensure the analysis is accurate and efficient. Specifically, I worked on the categorical variables 'JOL_group' and 'type_cue.' I transformed the categories of 'JOL_group' and 'type_cue' - such as 'delayed' and 'immediate,' and 'cue only' and 'stimulus pairs' - into a more easily understandable 'factor' format for the computer to work with. My plans include transforming them to one-hot encoding, a widely used and straightforward method for further handling categorical variables.
+
+I kept the type as-is 'num' for handling numerical variables because changing the type to an integer with float values would truncate the decimal part, which is essential in the analysis. I  checked for the labeling for the columns, and it seems reasonably written and meaningful, denoting confidence (ranging from conf1 to conf10) and recognition (ranging from rec1 to rec10). Upon reviewing the numerical data, I have found some negative values that might have occurred due to errors during data entry or collection. These values could also be outliers, representing extreme observations deviating from the majority of the data. Additionally, I noticed 7 missing values in each numerical variable column, which could imply gaps in the data. 
+
+So I adjusted the values to be within the constraint as it explicitly says, 'How confident are you that in about ten minutes from now, you will be able to recognize the second of the item when prompted with the first? (0 = definitely won't recognize, 20 = 20% sure, 40 ..., 60 ..., 80 ..., 100 = definitely will recognize)' I ensured that values below  0 and above 100 would result in an NA value. Therefore, the three affected columns were conf4 with the aftermath of 11 missing values, conf10 with 40 missing values, and rec5  with 9 missing values. Removing some of the missing values is recommended to improve the dataset's accuracy and reliability, and this can be up to 5% of the data. Also, excluding extreme values from the dataset is a good idea, which will help solve any issues and give better results, which I will do in the next blocks.
+
+## Missing data:
+
+- Using the 5% rule, exclude all rows that have missing data.
+- Create separate datasets for your continuous measures and categorical measures (because everyone can have slightly different, estimate all continuous columns regardless of their missingness for columns). 
+- Estimate the missing data for your continuous measures.
+- Combine your categorical columns back to your newly estimated continuous columns. 
+
+
+```{r missing}
+
+    # output that shows you have missing data
+    # One way to Check for Missing values
+    apply(copy_midtermDf ,2,function(x) sum(is.na(x))) 
+
+    percentmissing = function(x){sum(is.na(x))/length(x)*100}
+    
+    missingdata = apply(copy_midtermDf,1,percentmissing) # 1 for rows
+    table(missingdata)
+
+    replaceRow = subset(copy_midtermDf, missingdata <= 5) # 5 percent
+    missingData1 = apply(replaceRow,1,percentmissing)
+    table(missingData1)
+    
+    cat_col <- sapply(copy_midtermDf, is.factor)
+
+    replace_row <- replaceRow[, !cat_col]  # removing factor columns for outliers
+    dont_row <- replaceRow[, cat_col] 
+    
+    temp_no_miss = mice(replace_row) # perform multiple imputation
+  
+    no_miss = complete(temp_no_miss,1)
+    
+    #Join the data parts together
+    # binds the two factor column with the dataset that has no  missing values
+    nomissing_midterm <- cbind(dont_row,no_miss) 
+    
+    print("Before::: fixing the missing values for type_cue\n")
+    skim(nomissing_midterm)
+
+    
+    # Getting the mode value for type-cue
+    type_cue_mode <- names(which.max(table(nomissing_midterm$type_cue)))
+
+    # apply the mode value to all the 7 missing values
+    nomissing_midterm$type_cue[is.na(nomissing_midterm$type_cue)] <- type_cue_mode
+    
+    # Check if there are missing values
+    print("After fixing the missing values for type_cue\n")
+
+    skim(nomissing_midterm) 
+
+  
+```
+__Summary: __
+
+__Missing data exclusions, separated into two datasets __
+
+During the data cleaning process, I removed rows with missing values using the 5% rule during the data cleaning process, which decreased our dataset from 264 to 223 observations while still retaining the 22 variables. Next, I separated the categorical variables (stored in a dataset called 'dont_row') from the numerical  variables (stored in a dataset called 'replace_row') and utilized the MICE package to perform multiple imputations on the numeric values. This process created a dataset called 'nomissing_midterm', which had no missing values.
+
+__Missing data estimation, combining back together __
+
+However, the type_cue column was affected by the 5% rule, resulting in a decrease of missing values from 7 to 4. To address this issue, I performed a mode imputation on the type_cue variable, replacing the missing values with the mode. Consequently, the final result was a cleaned dataset with no missing values. This cleansed dataset is then saved in the object named __'nomissing_midterm'__ which is a combined dataset of the categorical and numerical values using this code: __cbind(dont_row,no_miss)__ 
+
+## Outliers:
+
+a. Calculate your Mahalanobis distance scores. 
+b. Include a summary of your mahal scores that are greater than the cutoff.
+c. How many outliers did you have? 
+d. Exclude all outliers. 
+
+```{r outliers}
+
+    # Removing the factor variables - the categorical variables
+    
+    midterm_Outlier <- nomissing_midterm[,-c(1,2)]
+
+    # convert group to numeric since it stored as factor
+
+    # a
+    mahal = mahalanobis(midterm_Outlier,
+                    colMeans(midterm_Outlier, na.rm=TRUE),
+                    cov(midterm_Outlier, use ="pairwise.complete.obs")
+                    )
+
+    # b
+    summary(mahal)
+
+    # c
+    cutoff = qchisq(1-.001,ncol(midterm_Outlier))
+    print(cutoff) # 45.314
+    
+    summary(mahal < cutoff) # no  outliers
+    
+    # d 
+    noOutliers_midterm = subset(midterm_Outlier, mahal < cutoff)
+    str(noOutliers_midterm)
+    summary(noOutliers_midterm)
+
+```
+__Summary: __
+
+I analyzed a dataset named 'nomissing_midterm' and checked for outliers. To do this, I calculated the Mahalanobis distance for each observation based on the numerical values of confidence (conf1 to conf10) and recognition (rec1 to rec10). I then removed the factor variables and combined the Mahalanobis distances. Using the chi-square distribution with degrees of freedom equal to the number of variables, I determined a cutoff value of approximately 45.31. Any observation with a Mahalanobis distance greater than this cutoff was marked as a potential outlier. I found no outliers in this dataset, so I removed the observations that exceeded the cutoff. The resulting dataset, named 'noOutliers_midterm,' includes 223 observations with 20 variables, including confidence and recognition ratings. The confidence and recognition ratings range from minimum to maximum across the variables, providing a sense of the distribution and central tendency of the data after outlier removal.
+
+
+# Assumptions:
+
+## Additivity: 
+
+- Include a `corrplot()` of your continuous measures. 
+    
+```{r additivity}
+  
+    corrplot(cor(noOutliers_midterm)) # continuous measures
+
+    symnum(cor(noOutliers_midterm))
+
+```
+__Summary: __
+
+The data collected includes various levels of confidence scores ('conf1' to 'conf10') and recognition scores ('rec1' to 'rec10'), but no 'strong' correlation is observed between them. 
+
+
+## Linearity: 
+
+- Include a picture that shows how you might assess multivariate linearity.
+
+```{r linearity}
+
+    random = rchisq(nrow(noOutliers_midterm), 21) 
+    summary(random)
+    
+    m = lm(random~., data = noOutliers_midterm) 
+    summary(m) # fake regression  Fake regression information
+    
+    standardized = rstudent(m) 
+    qqnorm(standardized)
+    abline(0,1)
+
+    plot(m, 1)    
+
+```
+__Summary: __
+
+When analyzing multivariate data, we look at all possible combinations for a comprehensive review. If any issues arise, we can use scatter plots to assess whether nonparametric tests should be conducted. To evaluate linearity, I assumed a linear relationship between columns. From this I have met this assumption, as standardized errors are normally distributed around the zero line. Lastly, we have not found any curvilinear pattern or deviation from normal distribution after examining the plot (i.e., the data is cone-shaped or triangle).
+
+For the __fake regression interpretation__, I fitted the multiple linear regression model to a dataset with the dependent variable 'random' and various predictor variables, including confidence ratings (conf1 to conf10) and recognition ratings (rec1 to rec10). The model showed a non-zero intercept with a statistically significant (p = 0.0488). However, only the coefficient for 'conf9' amongst the predictors was statistically significant (p = 0.0501), indicating that changes in confidence rating 9 are associated with changes in the dependent variable. However, the overall model has a low R-squared value (0.08278) and a nonsignificant F-statistic (p = 0.573), indicating that it lacks strong explanatory power. While the model has identified a significant relationship for 'conf9', it lacks robustness in explaining the variability in the dependent variable 'random' based on the provided predictors.
+
+## Normality: 
+
+- Include a picture that shows how you might assess multivariate normality.
+
+```{r normality}
+
+    hist(standardized, main= "Histogram of Standardized", xlab = "standardized", breaks=15)
+
+    plot(m, 2)
+
+```
+__Summary: __
+
+Upon analyzing the histogram, it is evident that the data is not uniformly spread and centered around 0, with some values skewed towards the right. This distribution is not perfectly symmetrical but presents a 'slightly' positively skewed distribution.
+
+Similarly, upon examining the scatter plot,  I observed that over 50 percent of the data stayed close to the line. In contrast, a few data points deviate from the line (especially towards the beginning and end).
+
+Based on these observations, it __meets the assumption of normality__.
+
+## Homogeneity/Homoscedasticity:
+
+- Include a picture that shows how you might assess multivariate homogeneity.
+
+```{r homog-s}
+
+    fitvalues = scale(m$fitted.values)
+    plot(fitvalues, standardized) 
+    abline(0,0)
+    abline(v = 0)
+
+```
+__Summary: __
+
+Data is  evenly dispersed and spread out due to it meeting the assumption of Homogeneity/Homoscedasticity.
+
+
+# Data exploration:
+
+Create and save average scores for confidence and recognition across trial blocks (two separate columns). Use the following: `apply(dataset[ , column #s for confidence or recognition], 1, mean)`. You will use these average scores for the rest of the test. 
+
+```{r avg-scores}
+    
+    # Using regular expressions to dynamically select columns that start with 'conf' and 'rec.'
+    conf_col <- grep('^conf', names(nomissing_midterm))
+
+    rec_col <- grep('^rec', names(nomissing_midterm))
+    
+    # Calculate average confidence scores per observation values
+    nomissing_midterm$avg_confidence <- apply(nomissing_midterm[, conf_col], 1, mean)
+    
+    # Calculate average recognition scores per observation values
+    nomissing_midterm$avg_recognition <- apply(nomissing_midterm[, rec_col], 1, mean)
+    
+    cat("Average scores for Confidence\n")
+    summary(nomissing_midterm$avg_confidence)
+    
+    cat("\nAverage scores for Recognition\n")
+    summary(nomissing_midterm$avg_recognition)
+  
+```
+
+
+
+Create histograms of the confidence and recognition average scores (you can use hist or ggplot2). These charts do not have to be pretty. 
+
+- Do these frequency distributions appear normal?
+
+```{r histogram}
+
+   tidyUp =  theme(panel.grid.major = element_blank(),
+                      panel.grid.minor = element_blank(),
+                        panel.background = element_blank(),
+                        axis.line= element_line(color = "black"))
+        
+   confidence_hist = ggplot(data=nomissing_midterm, aes(nomissing_midterm$avg_confidence)) + 
+   geom_histogram(bins=30,
+                  col="black", 
+                  fill="white", 
+                  alpha = .2) +
+   labs(title="Histogram for average confidence values") +
+   labs(x="confidence", y="Count")
+
+    confidence_hist + theme_bw() + tidyUp
+   
+   
+   recognition_hist = ggplot(data=nomissing_midterm, aes(nomissing_midterm$avg_recognition)) + 
+   geom_histogram(bins=30,
+                  col="black", 
+                  fill="white", 
+                  alpha = .2) +
+   labs(title="Histogram for average recognition values") +
+   labs(x="recognition", y="Count")
+
+   recognition_hist + theme_bw() + tidyUp
+   
+```
+__Summary: __
+
+It __meets__ the __assumption of normality__.  
+
+Print out the means, standard deviations, and length for each condition (JOL-Group and Type Cue combined together) in the study for average recognition only. 
+
+```{r descriptives}
+
+    # Assuming your dataset is named nomissing_midterm
+    stats_recognition <- nomissing_midterm %>%
+      group_by(JOL_group, type_cue) %>%
+      summarize(
+        means = mean(avg_recognition, na.rm = TRUE),
+        standard_deviation = sd(avg_recognition, na.rm = TRUE),
+        length = length(avg_recognition),
+        .groups = 'drop' 
+      )
+    
+    # Stats of each condition (JOL-Group and Type Cue combined together) for avg recognition
+    print(stats_recognition)
+ 
+```
+
+Use MOTE to calculate the effect size for the difference between recognition scores for the following comparisons:
+
+- Immediate JOL versus Delay JOL for cue only.
+- Immediate JOL versus Delay JOL for stimulus pairs.
+- What are the sizes of these effects? 
+
+```{r MOTE}
+
+    # Immediate JOL versus Delay JOL for cue only.
+    cue_only_mote <- subset(nomissing_midterm, type_cue =='cue only')
+    delay__for_cue_only<- subset(nomissing_midterm, JOL_group =='delayed')
+    immediate_for_cue_only <- subset(nomissing_midterm, JOL_group == 'immediate')    
+
+    mean_delay <- mean(delay__for_cue_only$avg_recognition)
+    mean2_immediate <- mean(immediate_for_cue_only$avg_recognition)
+    sd_delay <- sd(delay__for_cue_only$avg_recognition)
+    sd_immediate <- sd(immediate_for_cue_only$avg_recognition)
+    
+    effect_size_cue_only <- d.ind.t(mean_delay, mean2_immediate, sd_delay, sd_immediate, 9, 9, a = .05)
+
+
+    # Immediate JOL versus Delay JOL for stimulus pairs
+    stimulus_pairs_mote <- subset(nomissing_midterm, type_cue =='stimulus pairs')
+    delay__for_stimulus_pairs <- subset(nomissing_midterm, JOL_group =='delayed')
+    immediate_for_stimulus_pairs <- subset(nomissing_midterm, JOL_group == 'immediate')    
+
+    mean_delay_stim <- mean(delay__for_stimulus_pairs$avg_recognition)
+    mean2_immediate_stim <- mean(immediate_for_stimulus_pairs$avg_recognition)
+    sd_delay_stim <- sd(delay__for_stimulus_pairs$avg_recognition)
+    sd_immediate_stim <- sd(immediate_for_stimulus_pairs$avg_recognition)
+    
+    effect_size_stimulus_pairs <- d.ind.t(mean_delay_stim, mean2_immediate_stim, sd_delay_stim, sd_immediate_stim, 9, 9, a = .05)
+
+    # Print the sizes of these effects
+    cat("MOTE for Immediate vs Delay (cue only):", effect_size_cue_only$d, "\n")
+    cat("MOTE for Immediate vs Delay (stimulus pairs):", effect_size_stimulus_pairs$d, "\n")
+
+
+```
+__Summary: __
+
+Both MOTE sizes appear to be __small__ since they are less than 0.5. 
+
+# Charts:
+
+On all of these questions, be sure to include a coherent label for the X and Y axes. You should change them to be "professional looking" (i.e. Proper Case, explain the variable listed, and could be printed in a journal). The following will be assessed:
+
+- Is it readable?
+- Is X-axis labeled appropriately?
+- Is Y-axis labeled appropriately?
+- Is it the right graph?
+- Do the labels look appropriate?
+- Are there error bars when appropriate?
+
+Make a bar chart with two independent variables: JOL group, type cue, average recognition. Use `na.omit(dataset)` to exclude any missing data. 
+
+```{r two-iv-bar}
+
+    nomissing_midterm <- na.omit(nomissing_midterm)
+  
+    barchart_df <- nomissing_midterm %>%
+        select(JOL_group, type_cue, avg_recognition)
+   
+     colnames(barchart_df) = c('df_JOL_group', 'df_type_cue', 'df_value')
+
+    ############################################################################
+
+    ind_barChart = ggplot(data=barchart_df,  aes(x = df_JOL_group, y = df_value, fill = df_type_cue)) +
+    stat_summary(fun.y = mean, geom = "bar", position = "dodge") +
+    stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+                 position = position_dodge(width = 0.70),  width = 0.5) +
+    xlab("Jol Group") +
+    ylab("Average Recognition") +
+    scale_fill_manual(name = "Type Cue", values = c('lavender', 'lightgreen')) + 
+         ggtitle(label = "Bar Chart of 2 Independent Variables - JOL group, Type cue") 
+
+    ############################################################################
+
+    ind_barChart + theme_bw() + tidyUp
+
+```
+__Summary: __
+
+The bar chart clearly and concisely represents the average recognition scores for various JOL groups and type cues. The x-axis is labeled appropriately as 'JOL Group,' while the y-axis is labeled 'Average Recognition.' The color coding for different 'type cue' is indicated in the legend. The chart adheres to the specified graph type of a bar chart and includes error bars to represent data variability. The presentation is easily readable, and the black-and-white theme enhances clarity.
+
+Make a repeated measures bar chart: Type of rating (average confidence, average recognition), rating. Hint: create a smaller dataset of just these variables first.
+
+```{r rm-bar}
+
+    # Assuming your dataset is named 'nomissing_midterm'
+    repeated_measures_df <- nomissing_midterm %>%
+      select(JOL_group, type_cue, avg_confidence, avg_recognition)
+    
+    # Rename columns for clarity
+    repeated_measures_df <- repeated_measures_df %>%
+      rename('Average Confidence' = avg_confidence, 'Average Recognition' = avg_recognition)
+    
+    # Convert the dataset to long format
+    small_dataset_long <- tidyr::gather(repeated_measures_df, key = "Type of Rating", value = "Average Values", -JOL_group, -type_cue)
+    
+    # Create a repeated measures bar chart
+    repeated_measures_chart <- ggplot(small_dataset_long, aes(x = interaction(JOL_group, type_cue), fill = `Type of Rating`, y = `Average Values`)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      facet_grid(. ~ `Type of Rating`, scales = "free_y", space = "free_y") +
+      xlab("JOL Group & Type Cue") +
+      ylab("Average Values") +
+      scale_fill_manual(values = c("Average Confidence" = "blue", "Average Recognition" = "green")) +
+      ggtitle("Repeated Measures Bar Chart: Type of Rating") 
+    
+    repeated_measures_chart +  theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+                                                  strip.text.x = element_text(size = 12)) +  tidyUp
+
+    
+    
+
+
+```
+
+
+Make a scatterplot of confidence 1 (`conf1`) and recognition 1 (`rec1`) to indicate how their first ratings are related. 
+
+```{r scatter-line}
+
+    scatter_line = ggplot(nomissing_midterm)+geom_point(
+                              aes(x=conf1, y=rec1),
+                              color="blue",
+                              size=2,
+                              alpha=0.5
+                            )+
+        scale_x_continuous(name="Confidence 1", breaks= seq(0, 80, 10))+
+        scale_y_continuous(name="Recognition 1", breaks= seq(0, 100, 10))+
+        ggtitle(label="Sscatterplot of confidence 1 and recognition 1")
+    
+
+     scatter_line + theme_bw()  + tidyUp
+     
+
+```
+
+__Summary: __
+
+The scatter plot illustrates a positive relationship between the ratings for confidence 1 and recognition 1, suggesting as rec1 increases, the conf1 increases in most data points. The relationship is moderately strong.
