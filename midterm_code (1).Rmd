@@ -1,5 +1,4 @@
 ---
-title: __ANLY 500 - Midterm Code Answers__
 author: __Ralchukwu Mogbogu__
 output:
   pdf_document:
