@@ -1,0 +1,464 @@
+---
+title: "Final Code Section"
+author: "Ralchukwu Mogbogu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+```
+
+# Instructions
+
+You will need to complete the portion of the exam before starting the second portion. You will use your answers on this exam to complete the second half. Only knitted files will be graded! Make sure your complete this portion of the exam on your own. Use your notes and class examples to get started with the code. 
+
+# Abstract
+
+Much attention has been devoted to how technological advancements have created a brave new workplace, revolutionizing the ways in which work is being carried out, and how employees can improve their productivity and efficiency. However, the advent of technology has also opened up new avenues and opportunities for individuals to misbehave. This study focused on cyberloafing—the act of employees using their companies' internet access for personal purposes during work hours. Cyberloafing, thus, represents a form of production deviance. Using the theoretical frameworks offered by social exchange, organizational justice and neutralization, we examined the often-neglected dark side of the internet and the role that neutralization techniques play in facilitating this misbehavior at the workplace. Specifically, we developed a model, which suggested that when individuals perceived their organizations to be distributively, procedurally and interactionally unjust, they were likely to invoke the metaphor of the ledger as a neutralization technique to legitimize their subsequent engagement in the act of cyberloafing.
+
+*Citation:* Lim, V. K. (2002). The IT way of loafing on the job: cyberloafing, neutralizing and organizational justice. Journal of Organizational Behavior, 23, 675-694. doi: 10.1002/job.161
+
+# Method
+
+Participants were given interviews to determine their perception of the company. After their interview the amount of cyberloafing (minutes per day) was measured using different types of computer stations. All employees were measured at each type of station. 
+
+# Dataset:
+
+-	Gender of the worker: male or female
+-	Perception of company: unjust, neutral, fair
+-	Cyberloafing: a measure of the amount of cyberloafing for several months
+-	Workstation distance: distance of workstation from boss
+-   Length of time: time spent working at current job
+
+In this section, the data will be loaded for you from the package. You will change the id = 123456 to your HU id number. This number will generate your data for you in the same time each way, so if you rerun this analysis, you will get the same numbers each time.   
+
+```{r libraries, warning=TRUE}
+library(learnSTATS)
+library(skimr)
+library(mice)
+library(ggplot2)
+library(dplyr)
+library(Hmisc)
+library(MeMoBootR)
+library(corrplot)
+library(cocor)
+library(reshape)
+library(pwr)
+library(MOTE)
+library(ez)
+```
+
+
+
+```{r starting}
+final <- final_data(idnum = 285166)
+#CHANGE ID
+
+
+summary(final)
+
+str(final)
+
+
+```
+
+```{r}
+skim(final)
+
+```
+
+```{r}
+#Made a copy of the original dataset
+
+copy_finalDf = final
+
+copy_finalDf$index <- seq_len(nrow(copy_finalDf))
+
+
+```
+
+# Data Preprocessing and Data Screening
+
+<p>
+
+This section includes conducting the following procedures:
+
+*   Accuracy Checks 
+*   Handle missing values
+*   Handle Outliers 
+
+</p>
+
+```{r preprocessing and data screening}
+
+# handling categorical variables 
+## Fix accuracy errors
+copy_finalDf$gender <- as.factor(copy_finalDf$gender)
+copy_finalDf$perception <- as.factor(copy_finalDf$perception)
+
+# handling continuous variables
+## selecting only numerical variables
+numerical_values <- copy_finalDf[, sapply(copy_finalDf, is.numeric)]
+summary(numerical_values)
+
+# selecting only nonnumeric variables
+char_factor_values <- copy_finalDf[, sapply(copy_finalDf, function(x) is.character(x) || is.factor(x))]
+char_factor_values$index <- seq_len(nrow(char_factor_values))
+
+
+```
+
+__Summary: __
+
+<p>
+
+For the first part of the preprocessing, I fixed data type issues from chr to factors for gender and perception since gender had two levels, female and male, and perception had three levels: fair, neutral, and unjust. The next part of the preprocessing involves handling missing values and outliers. 
+</p>
+
+
+```{r missing data}
+
+#Check for missing values
+
+apply(copy_finalDf ,2,function(x) sum(is.na(x)))
+
+cat("Missing data: ")
+table(apply(copy_finalDf,1,function(x){sum(is.na(x))/length(x)*100}))
+
+
+```
+__Summary: __
+
+<p>
+For handling missing values, no missing values in data it seems. Dataset is intact and does not have any missing values to be handled or imputed. Therefore, I skipped the accuracy check as dataset proves complete. I proceeded to then directly check for outliers and other neccesary data quality checks.
+
+</p>
+`
+
+
+```{r Outliers}
+
+##Handle outliers
+# Removing the factor variables - the categorical variables
+
+final_outlier <- numerical_values
+
+summary(numerical_values)
+
+cat("Checking for Outlier via boxplot:::::: BEFORE")
+# checking for outlier
+ggplot(final_outlier) +
+  aes(x = "", y = cyberloafing) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+
+ggplot(final_outlier) +
+  aes(x = "", y = distance) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+ggplot(final_outlier) +
+  aes(x = "", y = length) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+# cyberloafing
+
+cyberloafing_top <- boxplot.stats(final_outlier$cyberloafing)$out
+
+lowerbound <- quantile(final_outlier$cyberloafing, 0.01)
+upperbound <- quantile(final_outlier$cyberloafing, 0.99)
+
+print(lowerbound)
+print(upperbound)
+
+outlierInd <- which(final_outlier$cyberloafing < lowerbound | final_outlier$cyberloafing > upperbound)
+outlierInd
+
+final_outlier[outlierInd, "cyberloafing"]
+final_outlier[outlierInd, ]
+
+subset(final_outlier, cyberloafing != cyberloafing_top)
+
+
+iqr <- IQR(final_outlier$cyberloafing)
+upper <- quantile(final_outlier$cyberloafing, 0.75) + 1.5*iqr
+lower <- quantile(final_outlier$cyberloafing, 0.25) - 1.5*iqr
+
+cyberloaf_noOutlier_df<- subset(final_outlier, final_outlier$cyberloafing > lower & final_outlier$cyberloafing < upper)
+
+
+# distance
+
+distance_top <- boxplot.stats(cyberloaf_noOutlier_df$distance)$out
+
+distance_lowerbound <- quantile(cyberloaf_noOutlier_df$distance, 0.01)
+distance_upperbound <- quantile(cyberloaf_noOutlier_df$distance, 0.99)
+
+print(distance_lowerbound)
+print(distance_upperbound)
+
+outlierInd <- which(cyberloaf_noOutlier_df$distance < distance_lowerbound | cyberloaf_noOutlier_df$distance > distance_upperbound)
+outlierInd
+
+cyberloaf_noOutlier_df[outlierInd, "distance"]
+cyberloaf_noOutlier_df[outlierInd, ]
+
+subset(cyberloaf_noOutlier_df, distance != 0.714271)
+
+
+iqr <- IQR(cyberloaf_noOutlier_df$distance)
+upper <- quantile(cyberloaf_noOutlier_df$distance, 0.75) + 1.5*iqr
+lower <- quantile(cyberloaf_noOutlier_df$distance, 0.25) - 1.5*iqr
+
+
+dist_noOutlier_df<- subset(cyberloaf_noOutlier_df, cyberloaf_noOutlier_df$distance > lower & cyberloaf_noOutlier_df$distance < upper)
+
+
+# length
+
+length_top <- boxplot.stats(dist_noOutlier_df$length)$out
+length_top
+
+length_lowerbound <- quantile(dist_noOutlier_df$length, 0.01)
+length_upperbound <- quantile(dist_noOutlier_df$length, 0.99)
+
+print(length_lowerbound)
+print(length_upperbound)
+
+outlierInd <- which(dist_noOutlier_df$length < length_lowerbound | dist_noOutlier_df$length > length_upperbound)
+outlierInd
+
+dist_noOutlier_df[outlierInd, "length"]
+dist_noOutlier_df[outlierInd, ]
+
+subset(dist_noOutlier_df, length !=  46.77754)
+
+
+iqr <- IQR(dist_noOutlier_df$length)
+upper <- quantile(dist_noOutlier_df$length, 0.75) + 1.5*iqr
+lower <- quantile(dist_noOutlier_df$length, 0.25) - 1.5*iqr
+
+
+final_noOutlier_df<- subset(dist_noOutlier_df, dist_noOutlier_df$length > lower & dist_noOutlier_df$length < upper)
+
+rm(cyberloaf_noOutlier_df, dist_noOutlier_df, cyberloafing_top, lowerbound, upperbound,
+   outlierInd, iqr, upper, lower, distance_top, distance_lowerbound, distance_upperbound, length_top, 
+   length_lowerbound, length_upperbound)
+
+cat("Checking for Outlier via boxplot:::::: AFTER")
+
+# checking for outlier
+ggplot(final_noOutlier_df) +
+  aes(x = "", y = cyberloafing) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+
+# checking for outlier
+ggplot(final_noOutlier_df) +
+  aes(x = "", y = distance) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+
+# checking for outlier
+ggplot(final_noOutlier_df) +
+  aes(x = "", y = length) +
+  geom_boxplot(fill = "#ff5733") +
+  theme_minimal()
+
+
+
+cyberloaf_DF <- merge(char_factor_values, final_noOutlier_df, by = "index", all.x = FALSE)
+
+
+```
+
+
+__Summary: __
+
+<p>
+
+I analyzed a dataset called final_outlier to identify any unusual data points. First, I created graphs to see if there were any outliers in the cyberloafing, distance, and length variables. Then, I used Interquartile Range (IQR) to identify and remove outliers in each variable. I did this for cyberloafing, distance, and length and ended up with three outliers I removed. I combined the remaining numerical and non-numerical data to form a new dataset called cyberloaf_DF. Ultimately, I had a dataset with 393 observations of 3 variables instead of the original 396 observations. This systematic process helped me create a more reliable dataset for further analysis.
+
+
+</p>
+
+
+# One-way ANOVA
+
+- Are there differences in cyberloafing based on the perception of the company? Use a one-way ANOVA to determine if there are group differences. 
+    - Run the ANOVA using the `ez` library. 
+    - Do you see overall group differences?
+    - Can you assume homogeneity? 
+
+```{r anova}
+
+cyberloaf_DF$ID <- as.factor(1:nrow(cyberloaf_DF))
+
+one_wayAnova <- ezANOVA(data = cyberloaf_DF,
+                        dv = cyberloafing,
+                        between = perception,
+                        wid = ID,
+                        type = 3,  
+                        detailed = T)
+
+print(one_wayAnova)
+
+
+```
+__Summary: __
+
+<p>
+One-way ANOVA is one of the powerful statistical tests used to form reasonable conclusions in research studies. One way ANOVA can be used in many ways: to compare mean and significant differences between two or more groups, understand their interactions and how they influence outcome variables and can be the initial step before you perform a post-hoc test.The overall difference will be based on their P-values and F-test for my output. I am also going to use theANOVA results to see if it meets the assumption of homogeneity based on the p-value.
+
+To answer the question "Are there differences in cyberloafing based on the perception of the company?", there is a difference in cyberloafing based on the perception of the company. We look at p-value < 0.05 and F-test (709.3258) to understand this. These values indicate that there isindeed a significant difference in cyberloafing between the different groups within perception (basicallythe different levels of perception: fair, unjust, neutral, etc.).
+
+We cannot assume homogeneity because Levene's Test for Homogeneity of Variance indicates a violation in the assumption for homogeneity( F-test value 72.74 with P-value < 0.05). This could be due to a few reasons. First, the groups within "perception" are not equal, violating the assumption of variance homogeneity. Second, effect size may be an added issue, especially since the result showed that we have a rather large effect size for the main effect of perception (0.784). Third, the Levene's test shows that our p-value of 1.418165e-27 is extremely small. Violation of homogeneity may, in turn, affect the F-test's reliability and P-value significance. Despite violating the assumption for homogeneity, even though the result shows the assumption was not met, we can still draw a conclusion from the one-way ANOVA. Based on the high F statistics and P value < 0.05, we can see a significant difference in cyberloafing based on perception.
+
+</p>
+
+# Post Hoc
+
+- Run a post hoc test and correction on company perception.
+- Where are the group differences in company perception? Indicate how the groups are different (i.e., higher, lower, same). 
+
+```{r posthoc}
+
+
+##adjustment/correction via bonferonni
+pairwise.t.test(cyberloaf_DF$cyberloafing,
+                cyberloaf_DF$perception,
+                p.adjust.method = "bonferroni", 
+                paired = F, 
+                var.equal = T)
+
+
+```
+__Summary:__
+
+<p>
+I ran a post hoc test and correction on company perception. A post-hoc test is usually good to run, especially when your ANOVA reveals a statistically significant difference between tested variables. This test is also useful to show how the groups differ. Since I am running a post hoc and CORRECTION, I decided to use the Bonferroni correction. Post hoc corrects for type 1 error via p-value changes, and corrections adjust P values (increases, decreases, or same). The correction adjusts the significant level for the pairwise comparisons and post hoc corrections for type 1 errors via p-value changes (in order words, control type 1 error, which limits false positives).
+
+The post hoc analysis compared three groups within perception: fair, neutral, and unjust. The output/result for my post hoc test shows that the p-value less than 0.05 is for the difference between "fair & neutral" and "fair & unjust." The results via Bonferroni correction showed significance between fair vs. neutral, unjust vs neutral, and even unjust vs fair. However, to check if the groups are all similar, if not the same P-values (<2e-16). There is no difference between the groups regarding company perception of cyberloafing. Statistically, there may be many reasons for the similar (or same) differences, which may cause the lack of adjustment or no change in difference.
+
+</p>
+
+
+
+# Correlations 
+
+- Include a correlation table of all the continuous variables with the `Hmisc` library.
+
+```{r correl1}
+
+
+##all continous variables (all numberical variables/columns except columns 2 and 3 which are both categorical and then index and ID)
+rcorr(as.matrix(na.omit (cyberloaf_DF[, -c(1, 2, 3, 7)])))
+  
+# continuous measures for a visual representation  
+cor_matrix <- cor(cyberloaf_DF[, -c(1, 2, 3, 7)], use = "complete.obs")
+
+corrplot(cor_matrix)
+
+```
+
+__Summary: __
+
+<p>
+For the correlation table, I included one of all the continuous variables with the "Hmisc" library already loaded at the start of the file, along with other libraries. The continuous variables for this study are the numerical ones. Therefore, the continuous variables here are cyberloafing, distance, and length. The code I used omits the use of unnecessary columns and categorical columns (1, 2, 3, and 7) for this correlation analysis. Using the same tactics, I coded to show a correlation plot/matrix for visualization representation. Regarding correlation, 1 (positive) and -1(negative) indicate a strong correlation. From the output, aside from the variables that may show a strong correlation with themselves (e.g., 1.00), the strongest correlation from this table is between cyberloafing and length at 0.72,  which is closest to 1.00. Length and distance, on the other hand, are not correlated with each other. Therefore, there is a significant relationship between how much cyberloafing an employee does and how much time they have spent working at that current job.
+
+</p>
+
+- Calculate the difference in correlations for:
+*   1) cyberloafing and distance  
+*   2) cyberloafing and length of time. 
+- Are these two correlations different?
+
+```{r differences}
+
+cocor(~cyberloafing + distance | cyberloafing + length, data = cyberloaf_DF)
+
+
+```
+__Summary: __
+
+<p>
+
+For the correlation differences, the output shows the "Results of a comparison of two overlapping correlations based on dependent groups." From the output produced, we can see that cyberloafing is positively related to distance at 0.6424 (r.jk) and is also positively related to length at 0.722 (r.jh). The difference, which is -0.0795 (as shown via difference: r.jk - r.jh = -0.0795), means that the correlation between r.jk as compared to r.jh is lower by 0.0795, hence the negative direction of the difference. From the correlation, we can conclude that cyberloafing and distance have a weaker correlation than cyberloafing and length. So, the correlations for cyberloafing with both variables (length of time and distance) are different. Additionally, other tests also show the calculation of the difference, and via their confidence intervals, we can see that none include zero, so they are significant and reject the null hypothesis.
+
+</p>
+
+# Hierarchical Regression: 
+
+- Use a hierarchical regression predicting cyberloafing with the following steps:
+    - Step 1: Gender
+    - Step 2: Perception of Company
+    - Step 3: Length of time, workstation distance 
+- Include the `summary()` at each step. Include an `anova()` on all three models to be able to examine the changes in each step. 
+
+```{r regression}
+
+Step1 <- lm(cyberloafing ~ gender, data = cyberloaf_DF)
+Step2 <- lm(cyberloafing ~ gender + perception, data = cyberloaf_DF)
+Step3 <- lm(cyberloafing ~ gender + perception + length + distance, data = cyberloaf_DF)
+
+summary(Step1)
+summary(Step2)
+summary(Step3)
+anova(Step1, Step2, Step3)
+
+
+
+```
+__Summary: __
+
+<p>
+Hierarchical regression was performed on the variables in three (3) steps to predict cyberloafing changes within other variables. The steps of this regression analysis involve variables "gender," "perception," "length," and "distance." After that, we include "anova()" on all three models to examine the changes in each step.
+
+To successfully examine the hierarchical regression output, it is important to check if the addition of steps added a significant amount of variance (check F tests and P values), and also check which predictors are significant based on their P values. With the code inputted, we went about it in 3 steps. First, we show the relationship between cyberloafing and gender, and we know this because in linear regression using R programming, the tilde (~) usually specifies a relationship between variables. So, as the step goes to the next, we are specifying the relationship between an outcome variable (cyberloafing) and a predictor variable (gender, perception, length, and distance). From the output, we see that the output changed gender into a "dummy" variable to indicate male and female cyberloafing scores. Therefore, it is safe to say that the estimate for the male gender is 1.003 less than that of the female gender in this study. Also, as per statistical significance, "gendermale" is not
+statistically significant at a P-value of 0.42, greater than the p-value of 0.05. Also, the overall summary for this step shows that the f-statistic is 0.653 with a p-value of 0.4195, further showing that the first model is not statistically significant at the 0.05 level.
+
+The next model is the step 2 output. Model two shows if gender and perception influence (have an effect) cyberloafing. For this model, we see that perception is significant in step 2, with a p-value of <2e-16. Then, we move to the third model in step 3. We included length and distance in the formula to test the effect of cyberloafing. In step 3, we see a bit of a twist, "gendermale" becomes significant at an extremely small p-value of 4.17e-10. Then, for perception, only "perceptionunjust" is statistically significant at p-value 0.00588, while "perceptionneutral" is NOT significant at 0.15173. Please note that we are operating under the 0.05 significant level for p-value. Also, length (<;2e-16) and distance (<2e-16) are significant. Now that we have examined the summaries of all the models, we move on to the ANOVA part of this
+hierarchical regression. 
+
+From the ANOVA output of all the models/steps, we can see that adding each step came with a significant amount of variance. This is noticeable in step 2 (F: 3326.84, P: <2.2e-16) and especially in step 3 (F: 712.46, P: <2.2e-16). Most especially in step 3 because of the variation explained by predictors; additional predictors usually add more variance. Therefore, from all this, the predictor variables do indeed have an effect on the outcome variable. That is to say that we reject the null hypothesis based on the significance of each model with additional predictor variables. That is saying there is a sure effect on cyberloafing from other variables.
+
+</p>
+
+# Mediation or Moderation
+
+- Using cyberloaf as the dependent variable, test either:
+    - Mediation using distance as X and length of time as M - examining if length of time working for the company mediates the relationship between workstation distance and cyberloafing. 
+    - Moderation using distance as X and length of time as M - examining if length of time interacts with the workstation distance to predict cyberloafing. 
+    - Just one of these!
+    - You can use the special package for this analysis, but be sure to include all portions of the analysis as output (mediation: models, Sobel, bootstrapping; moderation: models + simple slopes).
+
+```{r medmod}
+
+output <- moderation1(y = "cyberloafing", x = "distance", m = "length", 
+                    df = cyberloaf_DF)
+
+output$graphslopes
+summary(output$model1)
+
+##moderation: models + simple slopes
+####assumption for linearity based on linear pattern
+####evidence of moderation based on the slopes on the interaction model (note: if they are parallel on the graph, it shows no evidence for moderation and interaction term is not significant)
+
+
+
+```
+__Summary: __
+
+<p>
+
+I decided to go with Moderation since we had to pick either that or Mediation.
+
+The summary of my "output$model1" provides evidence that there is indeed evidence of Moderation. Since the graphs are also printed out for data screening, my graph outputs show that the assumption of linearity is met; we can see that because the graphs show a linear pattern. The q-q plot shows that the data points follow the line and do not significantly deviate from it. The interaction plot (4th graph) also shows that the interaction term is significant, as the slopes are not perfectly parallel. Additionally, the slopes indicate that the effect of distance on cyberloafing may be moderated by length. Therefore, the effect of workstation distance from the boss on the amount of cyberloafing an employee may depend on the length of time spent working at that job. We may also look at the associated p-value of "distance:length" and distance and length by themselves, which are all statistically significant at <2e-16.
+
+</p>
