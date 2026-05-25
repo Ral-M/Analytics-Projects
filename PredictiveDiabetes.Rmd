@@ -1,0 +1,963 @@
+---
+title: "PDT2 - EDA ANLY525"
+author: "Ral Mogbogu"
+date: "2025-05-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+getwd()
+```
+
+
+```{r library}
+library(ggplot2) # Visualization
+library(dplyr) # Data manipulation
+library(caret)  # Predictive modeling 
+library(corrplot) 
+library(tidyr) # Data transformation
+library(reshape2)
+library(readxl)
+```
+```{r}
+library(randomForest)
+```
+```{r}
+install.packages("gbm")
+library(gbm)
+```
+```{r}
+library(MASS)
+```
+
+
+```{r}
+diabetes.df <- read_excel("~/ANLY 525 Project/diabetes_health_indicators.xlsx")
+
+```
+
+
+```{r}
+str(diabetes.df)
+```
+
+```{r smaller sample size}
+set.seed(123)
+diab.df <- diabetes.df[sample(nrow(diabetes.df), 3000), ]
+
+View(diab.df)
+```
+
+
+```{r}
+str(diab.df)
+```
+
+
+```{r}
+library(skimr)
+skim(diab.df)
+```
+
+
+```{r}
+apply(diab.df,2,function(x) sum(is.na(x)))
+```
+
+
+```{r}
+summary(diab.df)
+```
+
+```{r outliers}
+#Boxplots
+boxplot(diab.df$BMI, main = "Outliers in BMI", ylab = "BMI")
+boxplot(diab.df$MentHlth, main = "Outliers in Mental Health Distribution", ylab = "MentHlth")
+boxplot(diab.df$PhysHlth, main = "Outliers in Physical Health Distribution", ylab = "PhysHlth")
+
+
+```
+
+
+```{r check oultier columns}
+diab.df[diab.df$BMI > 60, ]
+diab.df[diab.df$MentHlth > 30, ] #no outlier cause scale is from 1-30 days
+diab.df[diab.df$PhysHlth > 30, ] #no outlier cause scale is from 1-30 days
+```
+
+
+```{r}
+
+ggplot(diab.df, aes(y = BMI)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.colour = "red", outlier.shape = 16) +
+  labs(title = "Boxplot of BMI",
+  y = "Body Mass Index (BMI)") +
+  theme_minimal()
+
+library(ggplot2)
+
+ggplot(diab.df, aes(y = MentHlth)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.colour = "red", outlier.shape = 16) +
+  labs(title = "Boxplot of Mental Health",
+       y = "MentHlth") +
+  theme_minimal()
+
+library(ggplot2)
+
+ggplot(diab.df, aes(y = PhysHlth)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.colour = "red", outlier.shape = 16) +
+  labs(title = "Boxplot of Physical Health",
+       y = "Physical Health (PhysHlth)") +
+  theme_minimal()
+```
+
+```{r copy}
+copy_diab.df = diab.df
+str(copy_diab.df)
+
+```
+
+```{r}
+unique(copy_diab.df$DiabOutcome) 
+
+unique(copy_diab.df$Sex)
+
+unique(copy_diab.df$GenHlth)
+unique(copy_diab.df$Income)
+unique(copy_diab.df$Age)
+
+unique(copy_diab.df$HighBP)
+unique(copy_diab.df$HighChol)
+unique(copy_diab.df$CholCheck)
+unique(copy_diab.df$Smoker)
+unique(copy_diab.df$HeartDiseaseorAttack)
+unique(copy_diab.df$PhysActivity)
+unique(copy_diab.df$Veggies)
+unique(copy_diab.df$HvyAlcoholConsump)
+unique(copy_diab.df$AnyHealthcare)
+unique(copy_diab.df$NoDocbcCost)
+```
+
+
+```{r}
+# Should return: 0 1 2
+
+# Step 2: Convert 0 and 1 (No Diabetes, Prediabetes) → 0
+# And 2 (Diabetes) → 1
+copy_diab.df$DiabOutcome <- ifelse(copy_diab.df$DiabOutcome == 2, 1, 0)
+
+# Step 3: Turn into a factor for modeling
+copy_diab.df$DiabOutcome <- factor(copy_diab.df$DiabOutcome,
+                                       levels = c(0, 1),
+                                       labels = c("No Diabetes", "Diabetes"))
+
+# Step 4: Check final result
+table(copy_diab.df$DiabOutcome)
+
+# re-coding no diabetes AND prediabetes as 0, and diabetes as 1
+```
+
+```{r}
+
+
+# Set up a layout for multiple plots (adjust nrow and ncol as needed)
+numeric_cols <- ncol(copy_diab.df)
+par(mfrow = c(ceiling(sqrt(numeric_cols)), floor(sqrt(numeric_cols))))
+par(mar = c(4, 4, 2, 1), oma = c(0, 0, 2, 0)) # Adjust margins
+
+# Create histograms for each column
+for (col in names(diab.df)) {
+  hist(diab.df[[col]],
+       breaks = 20, # Equivalent to bins=20
+       main = col,
+       xlab = col,
+       ylab = "Frequency")
+}
+
+title("Histograms of Variables in Diabetes Indicator Dataset", outer = TRUE) # Equivalent to plt.suptitle
+```
+
+```{r}
+unique(copy_diab.df$DiabOutcome) 
+
+unique(copy_diab.df$Sex)
+
+unique(copy_diab.df$GenHlth)
+unique(copy_diab.df$Income)
+unique(copy_diab.df$Age)
+
+unique(copy_diab.df$HighBP)
+unique(copy_diab.df$HighChol)
+unique(copy_diab.df$CholCheck)
+unique(copy_diab.df$Smoker)
+unique(copy_diab.df$HeartDiseaseorAttack)
+unique(copy_diab.df$PhysActivity)
+unique(copy_diab.df$Veggies)
+unique(copy_diab.df$HvyAlcoholConsump)
+unique(copy_diab.df$AnyHealthcare)
+unique(copy_diab.df$NoDocbcCost)
+```
+
+
+```{r factor}
+
+copy_diab.df$Sex <- factor(copy_diab.df$Sex, 
+                           levels = c(0, 1), labels = c("Female", "Male"))
+
+copy_diab.df$GenHlth <- factor(copy_diab.df$GenHlth, 
+                               levels = 1:5, 
+                               labels = c("Excellent", "Very Good", "Good", "Fair", "Poor"), ordered = TRUE)
+
+copy_diab.df$Income <- factor(copy_diab.df$Income, 
+                              levels = 1:8, 
+                              labels = c("<10k", "10–15k", "15–20k", "20–25k", "<35k", "<50k", "<75k", "75k+"), ordered = TRUE)
+
+copy_diab.df$Age <- factor(copy_diab.df$Age, 
+                           levels = 1:13, 
+                           labels = c("18–24", "25–29", "30–34", "35–39", "40–44","45–49", "50–54", "55–59", "60–64", "65–69", "70–74", "75–79", "80+"), ordered = TRUE)
+
+```
+
+
+```{r levels defined}
+# 0 is No, 1 is Yes
+copy_diab.df$HighBP <- factor(copy_diab.df$HighBP, 
+                              levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$HighChol <- factor(copy_diab.df$HighChol, 
+                                levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$CholCheck <- factor(copy_diab.df$CholCheck, 
+                                 levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$Smoker <- factor(copy_diab.df$Smoker, 
+                              levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$HeartDiseaseorAttack <- factor(copy_diab.df$HeartDiseaseorAttack,
+                                            levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$PhysActivity <- factor(copy_diab.df$PhysActivity, 
+                                    levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$Veggies <- factor(copy_diab.df$Veggies, levels = c(0, 1),
+                               labels = c("No", "Yes"))
+
+copy_diab.df$HvyAlcoholConsump <- factor(copy_diab.df$HvyAlcoholConsump, 
+                                         levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$AnyHealthcare <- factor(copy_diab.df$AnyHealthcare, 
+                                     levels = c(0, 1), labels = c("No", "Yes"))
+
+copy_diab.df$NoDocbcCost <- factor(copy_diab.df$NoDocbcCost, 
+                                   levels = c(0, 1), labels = c("No", "Yes"))
+```
+
+
+```{r}
+str(copy_diab.df)
+View(copy_diab.df)
+```
+
+
+```{r distributions}
+Diagnosis_distribution <- table(copy_diab.df$DiabOutcome)
+print("Diabetes Diagnosis")
+print(Diagnosis_distribution)
+
+# Distribution of HighBP
+HighBP_distribution <- table(copy_diab.df$HighBP)
+print("High Blood Pressure")
+print(HighBP_distribution)
+
+# Distribution of HighChol
+HighChol_distribution <- table(copy_diab.df$HighChol)
+print("High Cholesterol")
+print(HighChol_distribution)
+
+# Distribution of CholCheck
+CholCheck_distribution <- table(copy_diab.df$CholCheck)
+print("Cholesterol Check")
+print(CholCheck_distribution)
+
+# Distribution of BMI
+BMI_distribution <- table(copy_diab.df$BMI)
+print("BMI Distribution")
+print(BMI_distribution)
+
+# Distribution of Smoker
+Smoker_distribution <- table(copy_diab.df$Smoker)
+print("Smoke")
+print(Smoker_distribution)
+
+# Distribution of HeartDiseaseorAttack
+HeartDiseaseorAttack_distribution <- table(copy_diab.df$HeartDiseaseorAttack)
+print("Heart Disease - CHD or MI")
+print(HeartDiseaseorAttack_distribution)
+
+# Distribution of PhysActivity
+PhysActivity_distribution <- table(copy_diab.df$PhysActivity)
+print("Physical Activity:")
+print(PhysActivity_distribution)
+
+# Distribution of Veggies
+Veggies_distribution <- table(copy_diab.df$Veggies)
+print("Vegetables Consumption")
+print(Veggies_distribution)
+
+# Distribution of HvyAlcoholConsump
+HvyAlcoholConsump_distribution <- table(copy_diab.df$HvyAlcoholConsump)
+print("Heavy Alcohol Consumption")
+print(HvyAlcoholConsump_distribution)
+
+# Distribution of AnyHealthcare
+AnyHealthcare_distribution <- table(copy_diab.df$AnyHealthcare)
+print("Health Insurance Coverage")
+print(AnyHealthcare_distribution)
+
+# Distribution of NoDocbcCost
+NoDocbcCost_distribution <- table(copy_diab.df$NoDocbcCost)
+print("No Doctor Visit Due to Cost")
+print(NoDocbcCost_distribution)
+
+# Distribution of GenHlth
+GenHlth_distribution <- table(copy_diab.df$GenHlth)
+print("General Health Status")
+print(GenHlth_distribution)
+
+# Distribution of MentHlth
+MentHlth_distribution <- table(copy_diab.df$MentHlth)
+print("Mental Health Check")
+print(MentHlth_distribution)
+
+# Distribution of PhysHlth
+PhysHlth_distribution <- table(copy_diab.df$PhysHlth)
+print("Physical Health Check")
+print(PhysHlth_distribution)
+
+# Distribution of Sex
+Sex_distribution <- table(copy_diab.df$Sex)
+print("Gender Distribution")
+print(Sex_distribution)
+
+# Distribution of Age
+Age_distribution <- table(copy_diab.df$Age)
+print("Age Distribution")
+print(Age_distribution)
+
+# Distribution of Income
+Income_distribution <- table(copy_diab.df$Income)
+print("Income Distribution")
+print(Income_distribution)
+
+
+```
+
+```{r copy summary}
+summary(copy_diab.df)
+
+```
+
+```{r visualization of main variables}
+
+# target variable is "Diabetes Diagnosis" because it gives the diagnosis outcome: No diabetes, Prediabetes, and Diabetes. 
+
+ggplot(copy_diab.df, aes(DiabOutcome)) +
+  geom_bar(fill = "blue") +
+  labs(title = "Distribution of Diabetes Status")
+
+```
+```{r BMI}
+ggplot(copy_diab.df, aes(DiabOutcome, BMI, fill = DiabOutcome)) +
+  geom_boxplot() +
+  labs(title = "BMI vs. Diabetes Status")
+
+ggplot(copy_diab.df, aes(BMI)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "BMI Distribution")
+```
+
+```{r Age}
+ggplot(copy_diab.df, aes(DiabOutcome, Age, fill = DiabOutcome)) +
+  geom_boxplot() +
+  labs(title = "Age vs. Diabetes Status")
+
+ggplot(copy_diab.df, aes(Age)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Age Distribution")
+```
+
+
+```{r Chol and BP}
+ggplot(copy_diab.df, aes(DiabOutcome, HighChol, fill = DiabOutcome)) +
+  geom_boxplot() +
+  labs(title = "High Cholesterol vs. Diabetes Status")
+
+ggplot(copy_diab.df, aes(HighChol)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "High Cholesterol Distribution")
+
+ggplot(copy_diab.df, aes(DiabOutcome, HighBP, fill = DiabOutcome)) +
+  geom_boxplot() +
+  labs(title = "High Blood Pressure vs. Diabetes Status")
+
+ggplot(copy_diab.df, aes(Sex)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Gender Distribution")
+```
+
+```{r}
+ggplot(copy_diab.df, aes(DiabOutcome, PhysActivity, fill = DiabOutcome)) +
+  geom_boxplot() +
+  labs(title = "Age vs. Diabetes Status")
+
+ggplot(copy_diab.df, aes(Age)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Age Distribution")
+```
+
+
+
+```{r numeric columns visualizations}
+
+
+numeric_cols <- sapply(copy_diab.df, is.numeric)
+copy_diab_numeric <- copy_diab.df[, numeric_cols]
+
+# Convert the numeric data to long format
+copy_diab_long <- pivot_longer(copy_diab_numeric,
+                               cols = everything(),
+                               names_to = "variable",
+                               values_to = "value")
+
+# Create the histograms using ggplot2
+ggplot(copy_diab_long, aes(x = value)) +
+  geom_histogram(bins = 20, fill = "deepskyblue2", color = "black") +
+  facet_wrap(~ variable, scales = "free") +
+  labs(title = "Histograms of BMI, Mental Health, and Physical Health in The Diabetes Indicator Dataset",
+       x = "Value",
+       y = "Frequency") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 8),
+        plot.title = element_text(size = 12, hjust = 0.5))
+```
+
+```{r}
+# Scatter plots (all pairs)
+pairs(copy_diab.df[, c("BMI", "MentHlth", "PhysHlth")],
+      main = "Scatter Plot Matrix of BMI, MentHlth, PhysHlth")
+
+# Correlation matrix
+correlation_matrix <- cor(copy_diab.df[, c("BMI", "MentHlth", "PhysHlth")], use = "complete.obs")
+print("Correlation Matrix")
+print(correlation_matrix)
+
+# Covariance matrix
+covariance_matrix <- cov(copy_diab.df[, c("BMI", "MentHlth", "PhysHlth")], use = "complete.obs")
+print("Covariance Matrix")
+print(covariance_matrix)
+```
+# Modelling and Prediction
+Categories:
+
+1. Socioeconomic factors
+2. Lifestyle factors
+3. Health/Medical factors
+
+Models:
+
+1. Logistic regression
+2. Random forest
+3. Gradient boosting
+
+Research question and goal:
+
+Both revolve around testing the different models for useful predicting diabetes AND finding out which models are useful (IMPORTANT) in successfully predicting diabetes; I want to know the influential predictors, the once that really hold higher meaning.
+
+```{r training}
+
+# using my copy_diab.df and focusing on the diabetes outcome since it is the overall purpose
+
+set.seed(123)
+
+sp_index <- createDataPartition(copy_diab.df$DiabOutcome, p = 0.7, list = FALSE)
+train <- copy_diab.df[sp_index, ]
+test <- copy_diab.df[-sp_index, ]
+
+```
+
+
+# Socio economic factors
+
+```{r logrse}
+
+socio_logm <- glm(DiabOutcome ~ Age + Sex + Income + GenHlth + AnyHealthcare + NoDocbcCost,
+                  data = train, 
+                  family = binomial)
+
+summary(socio_logm)
+```
+
+```{r rfse}
+
+socio_rf <- randomForest(DiabOutcome ~ Age + Sex + Income + GenHlth + AnyHealthcare + NoDocbcCost, data = train,
+                         importance = TRUE)
+varImpPlot(socio_rf)
+```
+
+```{r}
+plot(socio_rf)
+```
+
+
+```{r gbmse}
+train$DiabNumer <- ifelse(train$DiabOutcome == "Diabetes", 1, 0)
+test$DiabNumer  <- ifelse(test$DiabOutcome == "Diabetes", 1, 0)
+```
+
+```{r}
+table(train$DiabNumer)
+str(train$DiabNumer) 
+```
+
+```{r gbmse}
+socio_gbm <- gbm(DiabNumer ~ Age + Sex + Income + GenHlth + AnyHealthcare + NoDocbcCost, 
+                 data = train,
+                 distribution = "bernoulli",
+                 n.trees = 1000,
+                 interaction.depth = 4,
+                 shrinkage = 0.01,
+                 cv.folds = 5,
+                 n.cores = NULL,
+                 verbose = FALSE)
+
+bestnotreese <- gbm.perf(socio_gbm, method = "cv")
+```
+
+
+```{r predictevaluatemodels}
+# LOGR
+
+sociologm_probs <- predict(socio_logm, test, type = "response")
+sociologm_pred <- ifelse(sociologm_probs > 0.5, "Diabetes", "No Diabetes")
+sociologm_pred <- factor(sociologm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(sociologm_pred, test$DiabOutcome)
+```
+
+```{r predictevaluatemodels}
+# RF
+
+sociorf_pred <- predict(socio_rf, test)
+confusionMatrix(sociorf_pred, test$DiabOutcome)
+```
+
+```{r predictevaluatemodels}
+# GBM
+
+sociogbm_probs <- predict(socio_gbm, test, n.trees = bestnotreese, type = "response")
+sociogbm_pred <- ifelse(sociogbm_probs > 0.5, "Diabetes", "No Diabetes")
+sociogbm_pred <- factor(sociogbm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(sociogbm_pred, test$DiabOutcome)
+
+```
+
+```{r}
+
+# Logistic Regression metrics
+logm_cm <- confusionMatrix(sociologm_pred, test$DiabOutcome)
+logm_acc <- logm_cm$overall['Accuracy']
+logm_sens <- logm_cm$byClass['Sensitivity']
+logm_spec <- logm_cm$byClass['Specificity']
+logm_prec <- logm_cm$byClass['Pos Pred Value']
+logm_f1 <- 2 * (logm_prec * logm_sens) / (logm_prec + logm_sens)
+
+# Random Forest metrics
+rf_cm <- confusionMatrix(sociorf_pred, test$DiabOutcome)
+rf_acc <- rf_cm$overall['Accuracy']
+rf_sens <- rf_cm$byClass['Sensitivity']
+rf_spec <- rf_cm$byClass['Specificity']
+rf_prec <- rf_cm$byClass['Pos Pred Value']
+rf_f1 <- 2 * (rf_prec * rf_sens) / (rf_prec + rf_sens)
+
+# GBM metrics
+gbm_cm <- confusionMatrix(sociogbm_pred, test$DiabOutcome)
+gbm_acc <- gbm_cm$overall['Accuracy']
+gbm_sens <- gbm_cm$byClass['Sensitivity']
+gbm_spec <- gbm_cm$byClass['Specificity']
+gbm_prec <- gbm_cm$byClass['Pos Pred Value']
+gbm_f1 <- 2 * (gbm_prec * gbm_sens) / (gbm_prec + gbm_sens)
+
+```
+
+```{r}
+modelsrlsts <- data.frame(
+  Model = c("Logistic Regression", "Random Forest", "GBM"),
+  Category = "Socioeconomic",
+  Accuracy = c(logm_acc, rf_acc, gbm_acc),
+  Precision = c(logm_prec, rf_prec, gbm_prec),
+  Recall = c(logm_sens, rf_sens, gbm_sens),   # aka Sensitivity
+  Specificity = c(logm_spec, rf_spec, gbm_spec),
+  F1_Score = c(logm_f1, rf_f1, gbm_f1)
+)
+
+print(modelsrlsts)
+
+```
+
+
+
+```{r}
+write.csv(modelsrlsts, "modelsrlsts.cvs", row.names = FALSE)
+
+```
+
+Dependent variable:
+•	Diabetes Diagnosis (3 classes: No Diabetes, Prediabetes, and Diabetes)
+Independent Variables: 
+•	Sensitive demographic: Sex, Age, and Income
+•	Lifestyle activities: Smoker, PhysActivity, Veggies, and HvyAlcoholConsump
+•	Health Status: HighBP, HighChol, Stroke, Heart DiseaseorAttak, CholCheck, BMI, GenHlth, MentHlth, and PhysHlth
+•	Healthcare access: AnyHealthCare, NoDocbcCost
+
+
+# Lifestyle factors
+
+```{r logls}
+
+lifes_logm <- glm(DiabOutcome ~ Smoker + PhysActivity + Veggies + HvyAlcoholConsump, 
+                  data = train, 
+                  family = binomial)
+
+summary(lifes_logm)
+
+```
+
+```{r rfls}
+lifes_rf <- randomForest(DiabOutcome ~ Smoker + PhysActivity + Veggies + HvyAlcoholConsump,
+                         data = train,
+                         importance = TRUE)
+varImpPlot(lifes_rf)
+
+```
+```{r}
+plot(lifes_rf)
+```
+
+```{r gbmls}
+lifes_gbm <- gbm(DiabNumer ~ Smoker + PhysActivity + Veggies + HvyAlcoholConsump, 
+                 data = train,
+                 distribution = "bernoulli",
+                 n.trees = 1000,
+                 interaction.depth = 4,
+                 shrinkage = 0.01,
+                 cv.folds = 5,
+                 n.cores = NULL,
+                 verbose = FALSE)
+
+bestnotreels <- gbm.perf(lifes_gbm, method = "cv")
+```
+
+
+```{r lifestyleprediction}
+# LOGR  
+
+lifeslogm_probs <- predict(lifes_logm, test, type = "response")
+lifeslogm_pred <- ifelse(lifeslogm_probs > 0.3, "Diabetes", "No Diabetes")
+lifeslogm_pred <- factor(lifeslogm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(lifeslogm_pred, test$DiabOutcome)
+```
+
+
+```{r lifestyleprediction}
+# RF
+
+lifesrf_pred <- predict(lifes_rf, test)
+confusionMatrix(lifesrf_pred, test$DiabOutcome)
+
+```
+
+
+```{r lifestyleprediction}
+# GBM
+
+lifesgbm_probs <- predict(lifes_gbm, test, n.trees = bestnotreels, type = "response")
+lifesgbm_pred <- ifelse(lifesgbm_probs > 0.3, "Diabetes", "No Diabetes")
+lifesgbm_pred <- factor(lifesgbm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(lifesgbm_pred, test$DiabOutcome)
+```
+
+
+```{r life}
+
+# Logistic Regression metrics
+lifeslog_cm <- confusionMatrix(lifeslogm_pred, test$DiabOutcome)
+lslogm_acc <- lifeslog_cm$overall['Accuracy']
+lslogm_sens <- lifeslog_cm$byClass['Sensitivity']
+lslogm_spec <- lifeslog_cm$byClass['Specificity']
+lslogm_prec <- lifeslog_cm$byClass['Pos Pred Value']
+lslogm_f1 <- 2 * (lslogm_prec * lslogm_sens) / (lslogm_prec + lslogm_sens)
+
+# Random Forest metrics
+lifesrf_cm <- confusionMatrix(lifesrf_pred, test$DiabOutcome)
+lsrf_acc <- lifesrf_cm$overall['Accuracy']
+lsrf_sens <- lifesrf_cm$byClass['Sensitivity']
+lsrf_spec <- lifesrf_cm$byClass['Specificity']
+lsrf_prec <- lifesrf_cm$byClass['Pos Pred Value']
+lsrf_f1 <- 2 * (lsrf_prec * lsrf_sens) / (lsrf_prec + lsrf_sens)
+
+# GBM metrics
+lifesgbm_cm <- confusionMatrix(lifesgbm_pred, test$DiabOutcome)
+lsgbm_acc <- lifesgbm_cm$overall['Accuracy']
+lsgbm_sens <- lifesgbm_cm$byClass['Sensitivity']
+lsgbm_spec <- lifesgbm_cm$byClass['Specificity']
+lsgbm_prec <- lifesgbm_cm$byClass['Pos Pred Value']
+lsgbm_f1 <- 2 * (lsgbm_prec * lsgbm_sens) / (lsgbm_prec + lsgbm_sens)
+
+#
+
+lsmodelsrlsts <- data.frame(
+  Model = c("Logistic Regression", "Random Forest", "GBM"),
+  Category = "Lifestyle",
+  Accuracy = c(lslogm_acc, lsrf_acc, lsgbm_acc),
+  Precision = c(lslogm_prec, lsrf_prec, lsgbm_prec),
+  Recall = c(lslogm_sens, lsrf_sens, lsgbm_sens),   # aka Sensitivity
+  Specificity = c(lslogm_spec, lsrf_spec, lsgbm_spec),
+  F1_Score = c(lslogm_f1, lsrf_f1, lsgbm_f1)
+)
+
+print(lsmodelsrlsts)
+
+```
+
+
+
+
+# Medical factors
+
+```{r loghf}
+
+medhlth_logm <- glm(DiabOutcome ~ HighBP + HighChol + CholCheck + BMI + HeartDiseaseorAttack + MentHlth + PhysHlth,
+                  data = train, 
+                  family = binomial)
+
+summary(medhlth_logm)
+
+```
+
+```{r rfhf}
+medhlth_rf <- randomForest(DiabOutcome ~ HighBP + HighChol + CholCheck + BMI + HeartDiseaseorAttack + MentHlth + PhysHlth,
+                         data = train,
+                         importance = TRUE)
+varImpPlot(medhlth_rf)
+
+```
+```{r}
+plot(medhlth_rf)
+```
+
+```{r gbmhf}
+medhlth_gbm <- gbm(DiabNumer ~ HighBP + HighChol + CholCheck + BMI + HeartDiseaseorAttack + MentHlth + PhysHlth, 
+                 data = train,
+                 distribution = "bernoulli",
+                 n.trees = 1000,
+                 interaction.depth = 4,
+                 shrinkage = 0.01,
+                 cv.folds = 5,
+                 n.cores = NULL,
+                 verbose = FALSE)
+
+bestnotreemh <- gbm.perf(medhlth_gbm, method = "cv")
+```
+
+
+```{r lifestyleprediction}
+# LOGR  
+
+mhlogm_probs <- predict(medhlth_logm, test, type = "response")
+mhlogm_pred <- ifelse(mhlogm_probs > 0.3, "Diabetes", "No Diabetes")
+mhlogm_pred <- factor(mhlogm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(mhlogm_pred, test$DiabOutcome)
+```
+
+
+```{r lifestyleprediction}
+# RF
+
+mhrf_pred <- predict(medhlth_rf, test)
+confusionMatrix(mhrf_pred, test$DiabOutcome)
+
+```
+
+
+```{r lifestyleprediction}
+# GBM
+
+mhgbm_probs <- predict(medhlth_gbm, test, n.trees = bestnotreemh, type = "response")
+mhgbm_pred <- ifelse(mhgbm_probs > 0.3, "Diabetes", "No Diabetes")
+mhgbm_pred <- factor(mhgbm_pred, levels = c("No Diabetes", "Diabetes"))
+
+confusionMatrix(mhgbm_pred, test$DiabOutcome)
+```
+
+
+
+```{r life}
+
+# Logistic Regression metrics
+mhlog_cm <- confusionMatrix(mhlogm_pred, test$DiabOutcome)
+mhlogm_acc <- mhlog_cm$overall['Accuracy']
+mhlogm_sens <- mhlog_cm$byClass['Sensitivity']
+mhlogm_spec <- mhlog_cm$byClass['Specificity']
+mhlogm_prec <- mhlog_cm$byClass['Pos Pred Value']
+mhlogm_f1 <- 2 * (mhlogm_prec * mhlogm_sens) / (mhlogm_prec + mhlogm_sens)
+
+# Random Forest metrics
+mhrf_cm <- confusionMatrix(mhrf_pred, test$DiabOutcome)
+mhrf_acc <- mhrf_cm$overall['Accuracy']
+mhrf_sens <- mhrf_cm$byClass['Sensitivity']
+mhrf_spec <- mhrf_cm$byClass['Specificity']
+mhrf_prec <- mhrf_cm$byClass['Pos Pred Value']
+mhrf_f1 <- 2 * (mhrf_prec * mhrf_sens) / (mhrf_prec + mhrf_sens)
+
+# GBM metrics
+mhgbm_cm <- confusionMatrix(mhgbm_pred, test$DiabOutcome)
+mhgbm_acc <- mhgbm_cm$overall['Accuracy']
+mhgbm_sens <- mhgbm_cm$byClass['Sensitivity']
+mhgbm_spec <- mhgbm_cm$byClass['Specificity']
+mhgbm_prec <- mhgbm_cm$byClass['Pos Pred Value']
+mhgbm_f1 <- 2 * (mhgbm_prec * mhgbm_sens) / (mhgbm_prec + mhgbm_sens)
+
+#
+
+mhmodelsrlsts <- data.frame(
+  Model = c("Logistic Regression", "Random Forest", "GBM"),
+  Category = "MedHealth",
+  Accuracy = c(mhlogm_acc, mhrf_acc, mhgbm_acc),
+  Precision = c(mhlogm_prec, mhrf_prec, mhgbm_prec),
+  Recall = c(mhlogm_sens, mhrf_sens, mhgbm_sens),   # aka Sensitivity
+  Specificity = c(mhlogm_spec, mhrf_spec, mhgbm_spec),
+  F1_Score = c(mhlogm_f1, mhrf_f1, mhgbm_f1)
+)
+
+print(mhmodelsrlsts)
+
+```
+
+
+
+## propensity score
+
+```{r}
+treatment <- "Smoker" # 1 = Yes, 0 = No
+outcome <- "DiabOutcome"
+
+```
+
+```{r}
+ps_model <- glm(Smoker ~ Age + Sex + Income + GenHlth + PhysActivity + BMI + HvyAlcoholConsump,
+                data = copy_diab.df,
+                family = binomial)
+
+copy_diab.df$pscore <- predict(ps_model, type = "response")
+
+```
+
+```{r}
+library(MatchIt)
+match_it <- matchit(Smoker ~ Age + Sex + Income + GenHlth + PhysActivity + BMI + HvyAlcoholConsump,
+                    data = copy_diab.df, distance = "glm", method = "nearest", 
+                    m.order = "largest", replace = FALSE)
+
+matched_data <- match.data(match_it)
+
+```
+
+```{r}
+summary(matched_data)
+```
+
+```{r}
+summary(glm(DiabOutcome ~ Smoker, data = matched_data, family = binomial))
+```
+
+```{r}
+treatment1 <- "HeartDisease" # 1 = Yes, 0 = No
+outcome <- "DiabOutcome"
+
+```
+
+```{r}
+ps_model1 <- glm(HeartDiseaseorAttack ~ Age + HighBP + HighChol + GenHlth + PhysActivity + BMI + HvyAlcoholConsump,
+                data = copy_diab.df,
+                family = binomial)
+
+copy_diab.df$pscore <- predict(ps_model1, type = "response")
+
+```
+
+```{r}
+#PSA
+
+match_it1 <- matchit(HeartDiseaseorAttack ~ Age + HighBP + HighChol + GenHlth + PhysActivity + BMI + HvyAlcoholConsump,
+                    data = copy_diab.df, distance = "glm", method = "nearest", 
+                    m.order = "largest", replace = FALSE)
+
+matched_data1 <- match.data(match_it1)
+
+```
+
+```{r}
+summary(matched_data1)
+```
+
+```{r}
+summary(glm(DiabOutcome ~ HeartDiseaseorAttack, data = matched_data1, family = binomial))
+```
+
+```{r}
+treatment2 <- "NoDocbcCost" # 1 = Yes, 0 = No
+outcome2 <- "DiabOutcome"
+
+```
+
+```{r}
+ps_model2 <- glm(NoDocbcCost ~ Age + PhysActivity + AnyHealthcare + BMI + Sex + MentHlth,
+                data = copy_diab.df,
+                family = binomial)
+
+copy_diab.df$pscore <- predict(ps_model2, type = "response")
+
+```
+
+```{r}
+
+match_it2 <- matchit(NoDocbcCost ~ Age + PhysActivity + AnyHealthcare + BMI + Sex + MentHlth,
+                    data = copy_diab.df, distance = "glm", method = "nearest", 
+                    m.order = "largest", replace = FALSE)
+
+matched_data2 <- match.data(match_it2)
+
+```
+
+```{r}
+summary(matched_data2)
+```
+
+```{r}
+summary(glm(DiabOutcome ~ NoDocbcCost, data = matched_data2, family = binomial))
+```
+## PSA propensity
+
+
+

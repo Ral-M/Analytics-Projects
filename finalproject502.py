@@ -7,8 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1mSjMvWKUsNVeUO0UqG0sFDFnqR1QhCYd
 """
 
-# Ralchukwu Mogbogu
-
 # import data
 placement <- read.csv("Placement_Data_Full_Class.csv")
 
