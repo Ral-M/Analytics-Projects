@@ -1,5 +1,5 @@
 # Ralchukwu Mogbogu
-# ANLY 565 Time Series and Forecasting 
+# Time Series and Forecasting 
 
 #1  Check your working directory
 
