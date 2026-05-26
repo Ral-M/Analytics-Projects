@@ -1,8 +1,5 @@
 # Ralchukwu Mogbogu 
-# ANLY 565 Time Series and Forecasting 
-# Practical Assignment #1 
-# Value: 150 points
-# Deadline: 
+# Time Series and Forecasting : 
 
 #library
 
@@ -14,7 +11,7 @@ getwd()
 
 #2  Set your working directory to "ANLY 565/RScript"
 
-setwd("C:/Users/somto/OneDrive/Documents/ANLY 565/RScript")
+setwd("C:/Users/xyz/RScript")
 print(getwd())
 
 
