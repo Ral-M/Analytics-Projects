@@ -1,7 +1,5 @@
+# Ralchukwu Mogbogu
 # ANLY 580 Time Series and Forecasting 
-# Practical Assignment #2
-# Value: 150 points
-# Deadline:
 
 #1  Check you working directory
 
@@ -16,7 +14,7 @@ library(readxl)
 
 library(nlme)
 
-setwd("C:/Users/somto/OneDrive/Documents/ANLY 565/RScript")
+setwd("C:/Users/xyz/RScript")
 print(getwd())
 
 
