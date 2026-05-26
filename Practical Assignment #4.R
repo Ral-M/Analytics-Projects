@@ -1,8 +1,5 @@
 # Ralchukwu Mogbogu
 # ANLY 565 Time Series and Forecasting 
-# Practical Assingment #4
-# Value: 150 points
-# Deadline: 
 
 #1  Check your working directory
 
@@ -16,9 +13,9 @@ library(readxl)
 
 library(nlme)
 
-
-setwd("C:/Users/somto/OneDrive/Documents/ANLY 565/RScript")
+setwd("xyz/xyz")
 print(getwd())
+
 
 
 #3  Download "ffrategdp.xls" data file and set the "observation_date" 
