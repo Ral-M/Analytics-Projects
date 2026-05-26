@@ -1,7 +1,7 @@
 ---
-title: "PDT2 - EDA ANLY525"
+title: "Predictive Diagnostics for Type II Diabetes"
 author: "Ral Mogbogu"
-date: "2025-05-04"
+date: "11-11-1111"
 output:
   pdf_document: default
   html_document: default
@@ -39,7 +39,7 @@ library(MASS)
 
 
 ```{r}
-diabetes.df <- read_excel("~/ANLY 525 Project/diabetes_health_indicators.xlsx")
+diabetes.df <- read_excel("~/ANLY Project/diabetes_health_indicators.xlsx")
 
 ```
 
